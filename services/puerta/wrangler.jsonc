@@ -1,0 +1,108 @@
+// Worker «puerta» de NodOS (ADR-0015, paso 2). Única API pública del Laboratorio.
+// Secretos (en local, en .dev.vars; en producción, con `wrangler secret put`):
+//   TURNSTILE_SECRET       clave secreta de Turnstile
+//   LAB_CLAVE              clave compartida con el servicio de datos (cabecera X-Lab-Clave)
+//   SUPABASE_SERVICE_KEY   opcional: permite que «borrar mi cuenta» borre también en Supabase
+//   JWKS_LOCAL             solo desarrollo: JWKS en JSON en lugar de pedirlo a Supabase
+//   GROQ_API_KEY           clave de Groq (con Zero Data Retention activado en su consola)
+//   MODAL_KEY, MODAL_SECRET  token de proxy de Modal (el servicio de datos lo exige en su borde)
+//
+// En producción, ENTORNO = "produccion" activa la revisión de configuración (src/seguridad.js):
+// sin JWKS_LOCAL, con Turnstile real, LAB_CLAVE de 32+ caracteres, todo en https, TURNSTILE_HOSTS y
+// los dos límites por IP. Si algo falta, la API responde 503 a todo y lo registra.
+{
+  "name": "nodos-puerta",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "d1_databases": [
+    { "binding": "DB", "database_name": "nodos", "database_id": "local-nodos", "migrations_dir": "migrations" }
+  ],
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["17 9 * * *"] },
+  "observability": { "enabled": true },
+  // Límite por IP (plan gratuito): ráfagas por ubicación de Cloudflare, no una cuota global.
+  // 120 peticiones por minuto a toda la API; 10 por minuto a lo costoso (análisis), que ya pide
+  // sesión, Turnstile y cuota: el tope es generoso porque en un campus muchos comparten IP.
+  "ratelimits": [
+    { "name": "LIMITE_IP", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } },
+    { "name": "LIMITE_IP_LAB", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
+    // Escrituras por usuario (guardar y borrar): 30 por minuto. Guardar una por una a mano no llega;
+    // «Guardar las N» va en lotes de 100 por petición.
+    { "name": "LIMITE_USUARIO", "namespace_id": "1003", "simple": { "limit": 30, "period": 60 } }
+  ],
+  // La fila del Laboratorio (src/fila.js): un solo Durable Object con almacenamiento SQLite, que es
+  // el que admite el plan gratuito.
+  "durable_objects": { "bindings": [{ "name": "FILA", "class_name": "Fila" }] },
+  "migrations": [{ "tag": "fila-v1", "new_sqlite_classes": ["Fila"] }],
+  "vars": {
+    "ENTORNO": "local",
+    "FILA_SIMULTANEOS": "2",
+    // Análisis al mes en todo el sitio; al llegar, el Laboratorio se pausa hasta el mes siguiente.
+    // 6,000 caben en los 30 USD de crédito de Modal con tarjeta (registrada el 29-sep-2026).
+    "TOPE_MES": "6000",
+    "TURNSTILE_HOSTS": "",
+    "ORIGENES": "http://127.0.0.1:8765,http://localhost:8765",
+    "LAB_URL": "http://127.0.0.1:8770",
+    "SUPABASE_URL": "https://vujmkcpxsdrmrwsijnlz.supabase.co",
+    "JWT_EMISOR": "",
+    "CUOTA_USUARIO_DIA": "2",
+    "TOPE_SITIO_DIA": "500",
+    "MAX_ANALISIS_GUARDADOS": "2",
+    "MAX_TESIS_GUARDADAS": "500",
+    "MAX_ASESORES_GUARDADOS": "200",
+    "MAX_LUGARES_GUARDADOS": "200",
+    "TOPE_IA_DIA": "55",
+    "GROQ_TOKENS_DIA": "180000",
+    "WORKERS_AI_NEURONAS_DIA": "9000"
+  },
+
+  // Producción (staging, 29-sep-2026): en la cuenta «NodOS», dueña de nodosmap.com. Los bindings y
+  // las vars no se heredan del nivel de arriba, así que van todos aquí. Sin «routes» todavía: hasta
+  // lanzar, responde solo en workers.dev (el dominio se conecta al final, con el sitio).
+  //   npx wrangler deploy --env produccion
+  //   npx wrangler d1 migrations apply nodos --remote --env produccion
+  //   npx wrangler secret put <NOMBRE> --env produccion
+  // Secretos: TURNSTILE_SECRET, LAB_CLAVE, GROQ_API_KEY, MODAL_KEY, MODAL_SECRET, SUPABASE_SERVICE_KEY.
+  // Sin cualquiera de los obligatorios, src/seguridad.js responde 503 a todo (falla cerrado).
+  "env": {
+    "produccion": {
+      "name": "nodos-puerta",
+      "account_id": "TU_ACCOUNT_ID",
+      "workers_dev": true,
+      // La API en el mismo origen que el sitio: la CSP de las páginas solo deja llamar a 'self'.
+      "routes": [
+        { "pattern": "nodosmap.com/api/*", "zone_name": "nodosmap.com" },
+        { "pattern": "www.nodosmap.com/api/*", "zone_name": "nodosmap.com" }
+      ],
+      "d1_databases": [
+        { "binding": "DB", "database_name": "nodos", "database_id": "TU_DATABASE_ID", "migrations_dir": "migrations" }
+      ],
+      "ai": { "binding": "AI" },
+      "ratelimits": [
+        { "name": "LIMITE_IP", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } },
+        { "name": "LIMITE_IP_LAB", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
+        { "name": "LIMITE_USUARIO", "namespace_id": "1003", "simple": { "limit": 30, "period": 60 } }
+      ],
+      "durable_objects": { "bindings": [{ "name": "FILA", "class_name": "Fila" }] },
+      "vars": {
+        "ENTORNO": "produccion",
+        "FILA_SIMULTANEOS": "2",
+        "TOPE_MES": "6000",
+        "TURNSTILE_HOSTS": "nodosmap.com,www.nodosmap.com",
+        "ORIGENES": "https://nodosmap.com,https://www.nodosmap.com",
+        "LAB_URL": "https://TU_WORKSPACE--nodos-lab-servicio.modal.run",
+        "SUPABASE_URL": "https://vujmkcpxsdrmrwsijnlz.supabase.co",
+        "JWT_EMISOR": "",
+        "CUOTA_USUARIO_DIA": "2",
+        "TOPE_SITIO_DIA": "500",
+        "MAX_ANALISIS_GUARDADOS": "2",
+        "MAX_TESIS_GUARDADAS": "500",
+        "MAX_ASESORES_GUARDADOS": "200",
+        "MAX_LUGARES_GUARDADOS": "200",
+        "TOPE_IA_DIA": "55",
+        "GROQ_TOKENS_DIA": "180000",
+        "WORKERS_AI_NEURONAS_DIA": "9000"
+      }
+    }
+  }
+}
