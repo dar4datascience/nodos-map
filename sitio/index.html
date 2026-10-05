@@ -659,6 +659,9 @@
         <div class="seg" id="density-toggle" title="Densidad del fondo (experimental)">
           <button type="button" data-pct="1" class="active">100%</button><button type="button" data-pct="0.5">50%</button><button type="button" data-pct="0.25">25%</button>
         </div>
+        <div class="seg" id="area-toggle" title="Filtrar el fondo por área UNAM (experimental)">
+          <button type="button" data-area="0" class="active">Todas</button><button type="button" data-area="1">Fís-Mat</button><button type="button" data-area="2">Bio-Salud</button><button type="button" data-area="3">Sociales</button><button type="button" data-area="4">Humanidades</button>
+        </div>
         <button type="button" class="btn" id="debug-log-toggle">Log</button>
       </div>
     <div data-nds-cuenta style="margin-left:auto"></div>
@@ -835,7 +838,8 @@
     palette: [], opacities: [],
     panelStack: [], selectedId: null,
     highlightKey: '',
-    densityPct: 1
+    densityPct: 1,
+    areaFilter: 0
   };
 
   // ==================== utilidades ====================
@@ -1165,7 +1169,9 @@
     }
     drawBusy = true;
     var o = Object.assign({}, opts || {});
-    if (state.densityPct < 1) o.filter = densityIndices(state.densityPct);
+    var flt = state.areaFilter ? areaIndices(state.areaFilter) : null;
+    if (state.densityPct < 1) flt = flt ? intersectIdx(flt, densityIndices(state.densityPct)) : densityIndices(state.densityPct);
+    if (flt) o.filter = flt;
     return Promise.resolve(state.scatterplot.draw({ x: x, y: y, valueA: cats }, o)).then(function () {
       drawBusy = false; drawMarks();
       if (drawNext) { var nx = drawNext; drawNext = null; return drawPoints.apply(null, nx.args).then(nx.resolve); }
@@ -1501,7 +1507,7 @@
   }
   function restoreView() {
     if (state.iso) return setCats('iso|' + state.iso.node.id, state.iso.cats);
-    return state.pin ? setCats(state.pin.key, state.pin.cats) : setCats('base|' + state.lens + '|' + state.densityPct, null);
+    return state.pin ? setCats(state.pin.key, state.pin.cats) : setCats('base|' + state.lens + '|' + state.densityPct + '|' + state.areaFilter, null);
   }
   function pinIndices(key, idxs) {
     var cats = new Float32Array(state.n); cats.fill(C_DIM);
@@ -3965,10 +3971,30 @@
     for (var i = 0; i < state.n; i++) { var h = Math.sin(i * 12.9898) * 43758.5453; if (h - Math.floor(h) < pct) out.push(i); }
     return (densityCache[pct] = out);
   }
+  // filtro por area UNAM: indices del catalogo cuyo areaCode coincide (orden ascendente, como densityIndices)
+  var areaCache = {};
+  function areaIndices(a) {
+    if (areaCache[a]) return areaCache[a];
+    var out = [];
+    for (var i = 0; i < state.n; i++) if (state.areaCode[i] === a) out.push(i);
+    return (areaCache[a] = out);
+  }
+  function intersectIdx(a, b) {
+    var out = [], i = 0, j = 0;
+    while (i < a.length && j < b.length) { if (a[i] === b[j]) { out.push(a[i]); i++; j++; } else if (a[i] < b[j]) i++; else j++; }
+    return out;
+  }
   document.querySelectorAll('#density-toggle button').forEach(function (b) {
     b.addEventListener('click', function () {
       document.querySelectorAll('#density-toggle button').forEach(function (x) { x.classList.toggle('active', x === b); });
       state.densityPct = parseFloat(b.getAttribute('data-pct')); state.highlightKey = ''; restoreView();
+    });
+  });
+  document.querySelectorAll('#area-toggle button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#area-toggle button').forEach(function (x) { x.classList.toggle('active', x === b); });
+      state.areaFilter = +b.getAttribute('data-area'); state.highlightKey = ''; restoreView();
+      $('fb-count').textContent = state.areaFilter ? fmtNum(areaIndices(state.areaFilter).length) + ' de ' + fmtNum(state.n) + ' tesis' : fmtNum(state.n) + ' tesis';
     });
   });
   $('debug-log-toggle').addEventListener('click', function () { $('debug-log').hidden = !$('debug-log').hidden; });
