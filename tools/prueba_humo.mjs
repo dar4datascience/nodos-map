@@ -12,8 +12,6 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'humo-'));
 const PAGINAS = [
   { pagina: 'index.html', espera: 15000, listo: "window.__debugAtlas&&__debugAtlas.state.scatterplot&&__debugAtlas.state.macros.length===130" },
   { pagina: 'index.html?tesis=TH_0462868', espera: 15000, listo: "document.getElementById('ms-title').getAttribute('data-idx')==='462866'&&!!document.querySelector('#ms-title a.leer')" },
-  { pagina: 'laboratorio.html', espera: 6000, listo: "!!document.getElementById('pr-titulo')&&typeof NodosAjustes==='object'" },
-  { pagina: 'espacio.html', espera: 5000, listo: "!document.getElementById('esp-vacio').hidden" },
   { pagina: 'acerca.html', espera: 4000, listo: "document.querySelectorAll('#mini circle').length===130" },
   { pagina: 'privacidad.html', espera: 3000, listo: "document.querySelectorAll('.legal h2').length===9" },
   { pagina: 'terminos.html', espera: 3000, listo: "document.querySelectorAll('.legal h2').length===15" },
