@@ -17,6 +17,15 @@
     return s;
   }
   var tiraAreas = '<i class="aj-a1"></i><i class="aj-a2"></i><i class="aj-a3"></i><i class="aj-a4"></i>';
+  // v4.40: la tira de facultades reusa los puntos multitonos (un color por escuela)
+  function tiraFacs() {
+    var s = '';
+    for (var i = 0; i < 12; i++) {
+      var r = i % 3, h = (i * 137.5 + 40) % 360;
+      s += '<i class="aj-c' + r + '" style="--h:' + h.toFixed(1) + '"></i>';
+    }
+    return s;
+  }
   var ICO_X = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
 
   var HTML =
@@ -31,11 +40,12 @@
       '<div class="aj-lentes" role="radiogroup" aria-labelledby="aj-h-lente">' +
         '<button type="button" role="radio" data-lente="territory"><span class="aj-radio"></span><span class="aj-txt"><b>Campos</b><small>Un color por cada uno de los 130 campos temáticos</small><span class="aj-tira">' + tiraCampos() + '</span></span></button>' +
         '<button type="button" role="radio" data-lente="area"><span class="aj-radio"></span><span class="aj-txt"><b>Áreas administrativas</b><small>Las cuatro áreas del catálogo de la UNAM</small><span class="aj-tira aj-tira-areas">' + tiraAreas + '</span></span></button>' +
+        '<button type="button" role="radio" data-lente="facultad"><span class="aj-radio"></span><span class="aj-txt"><b>Escuelas y facultades</b><small>Un color por facultad o escuela, con su escudo en el mapa</small><span class="aj-tira">' + tiraFacs() + '</span></span></button>' +
       '</div></section>';
 
   var caja, capa, boton, op = {}, antes = null;
   function oscuro() { return leer(CLAVE_MODO) === '1'; }
-  function lente() { return leer(CLAVE_LENTE) === 'area' ? 'area' : 'territory'; }
+  function lente() { var l = leer(CLAVE_LENTE); return (l === 'area' || l === 'facultad') ? l : 'territory'; }
   function pintar() {
     if (!caja) return;
     var o = op.modo ? op.modo() : oscuro(), l = op.lente ? op.lente() : lente();

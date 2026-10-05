@@ -20,7 +20,7 @@ SITIO = os.path.join(RAIZ, 'sitio')
 DIST = os.path.join(RAIZ, 'dist')
 ARCHIVOS = ['index.html', 'acerca.html', 'privacidad.html', 'terminos.html', 'contacto.html',
             'favicon.svg', 'ventanas-dia.svg', 'ventanas-noche.svg', 'mit-license.png', '_headers']
-CARPETAS = ['compartido', 'vendor', 'data']
+CARPETAS = ['compartido', 'vendor', 'data', 'escudos']
 # vecindario_preview.v1.json (24 MB): ya no lo descarga el mapa (v4.38.5); sigue en el repo, como salida del pipeline.
 # sesion.js, cuenta.css, bloom.js y supabase-js solo los usan las páginas que ya no se publican.
 FUERA = {'LEEME.md', 'vecindario_preview.v1.json', 'sesion.js', 'cuenta.css', 'bloom.js', 'supabase-js-2.117.2.js'}
