@@ -1,0 +1,47 @@
+# Publica el sitio en GitHub Pages en cada push a main (o a mano).
+# El flujo de artefactos no pasa por Jekyll; además, construir_sitio.py genera
+# .nojekyll para que los archivos con guion bajo (p. ej. data/busqueda/titulos/_indice.json)
+# lleguen tal cual aunque la configuración de publicación cambie.
+# Requiere, en el repositorio: Settings > Pages > Build and deployment > Source: GitHub Actions.
+name: publicar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez; si llega otro push se cancela el que siga corriendo.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Datos del mapa (Release, en caché)
+        uses: actions/cache@v4
+        with:
+          path: sitio/data
+          key: datos-${{ hashFiles('tools/descargar_datos.py') }}
+      - run: python3 tools/descargar_datos.py
+      - run: python3 tools/construir_sitio.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

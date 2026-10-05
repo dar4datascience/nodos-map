@@ -1,6 +1,6 @@
 # NodOS
 
-**Mapa semántico de las tesis de la UNAM.** [nodosmap.com](https://nodosmap.com)
+**Mapa semántico de las tesis de Ciencias Sociales de la UNAM.** [dar4datascience.github.io/nodos-map](https://dar4datascience.github.io/nodos-map/)
 
 NodOS ordena más de 600 mil tesis de licenciatura, maestría y doctorado del catálogo TESIUNAM
 según el parecido de sus títulos. Las que tratan temas cercanos quedan juntas, sin importar la
