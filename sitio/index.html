@@ -86,10 +86,7 @@
   .seg button { border: none; background: none; padding: 5px 0 4px; cursor: pointer; font-size: 14px; color: var(--ink-3); border-bottom: 2px solid transparent; }
   .seg button:hover { color: var(--ink); }
   .seg button.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
-  #area-toggle { gap: 14px; }
-  #area-toggle button { border: none; background: none; padding: 5px 0 4px; cursor: pointer; font-size: 13px; color: var(--ink-3); border-bottom: 2px solid transparent; }
-  #area-toggle button:hover { color: var(--ink); }
-  #area-toggle button.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+  .fb-scope { padding: 5px 0 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
 
   /* ---------- navegacion global [2] ---------- */
   header.nav { display: flex; align-items: center; gap: 28px; height: var(--nav-h); padding: 0 24px; background: var(--paper); border-bottom: 1px solid var(--line); position: relative; z-index: 14; flex-shrink: 0; }
@@ -637,16 +634,14 @@
   <div class="filterbar" id="filterbar" role="toolbar" aria-label="Filtros del mapa">
     <nav id="crumbs" aria-label="Ubicación en el mapa" hidden></nav>
     <span class="fb-count" id="fb-count"></span>
-    <div class="fb-group" id="area-toggle" role="group" aria-label="Filtrar por área UNAM">
-      <button type="button" data-area="0" class="active">Todas</button><button type="button" data-area="1">Fís-Mat</button><button type="button" data-area="2">Bio-Salud</button><button type="button" data-area="3">Sociales</button><button type="button" data-area="4">Humanidades</button>
-    </div>
+    <span class="fb-scope" title="El mapa muestra solo las tesis del área de Ciencias Sociales">Ciencias Sociales</span>
     <span class="fb-info" id="fb-info" hidden><button type="button" class="fb-q" id="fb-q" aria-expanded="false" aria-controls="fb-nota" aria-label="Sobre esta cifra" title="Sobre esta cifra">?</button><span class="fb-nota" id="fb-nota" role="note" hidden>Tesis del catálogo público TESIUNAM incluidas en NodOS, según la copia que se procesó para construir el mapa. La versión en línea puede tener registros más recientes o que no se incluyeron. Última actualización de los registros: 5 de junio de 2026. Los datos depurados se publican como <a href="https://www.kaggle.com/datasets/sebastiandiazprado/nodos-map" target="_blank" rel="noopener">dataset abierto en Kaggle</a>.</span></span>
     <button type="button" class="navsearch" id="btn-search" aria-label="Buscar (Ctrl+K)"><svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4L14 14"/></svg><span>Buscar tema, título o asesor</span></button>
   </div>
   <div id="debug-log" hidden></div>
 
   <main id="main" tabindex="-1">
-    <h1 class="oculto">NodOS: mapa de las tesis de la UNAM</h1>
+    <h1 class="oculto">NodOS: mapa de las tesis de Ciencias Sociales de la UNAM</h1>
     <div id="wgl-host"></div>
     <div id="tint" aria-hidden="true"></div>
     <canvas id="flow" aria-hidden="true"></canvas>
@@ -778,6 +773,7 @@
   var AREA_NOCHE = { 0: '#8c93a3', 1: '#5b93e6', 2: '#27a97c', 3: '#b0801c', 4: '#e0567a' };
   var AREA_HEX = Object.assign({}, AREA_DIA);
   var AREA_STR_TO_CODE = { 'area 1': 1, 'area 2': 2, 'area 3': 3, 'area 4': 4 };
+  var AREA_MAPA = 3; // el sitio publico solo muestra el area de Ciencias Sociales
 
   // Paleta del fondo WebGL: todas las categorias se declaran de entrada (colorBy /
   // opacityBy = valueA). El "lente" cambia que array de categorias se dibuja, no
@@ -801,7 +797,7 @@
     panelStack: [], selectedId: null,
     highlightKey: '',
     densityPct: 1,
-    areaFilter: 0
+    areaFilter: AREA_MAPA
   };
 
   // ==================== utilidades ====================
@@ -946,7 +942,7 @@
     // rawX/rawY: coordenadas PaCMAP crudas (para ubicar la tesela de titulos);
     // dispX/dispY: donde esta DIBUJADO cada punto ahora (difiere en modo aislado).
     state.rawX = xs; state.rawY = ys; state.dispX = state.ndcX; state.dispY = state.ndcY;
-    $('fb-count').textContent = fmtNum(n) + ' tesis'; $('fb-info').hidden = false; // el «?» aparece con la cifra, no antes
+    $('fb-count').textContent = fmtNum(areaIndices(AREA_MAPA).length) + ' de ' + fmtNum(n) + ' tesis'; $('fb-info').hidden = false; // el «?» aparece con la cifra, no antes
     // el «?» de la cifra: abre y cierra la nota; se cierra con Esc o con un clic fuera
     var notaCifra = function (on) { $('fb-nota').hidden = !on; $('fb-q').setAttribute('aria-expanded', String(on)); };
     $('fb-q').addEventListener('click', function (ev) { ev.stopPropagation(); notaCifra($('fb-nota').hidden); });
@@ -1566,6 +1562,7 @@
   // vecinas. Antes volaba directo al territorio y la tesis nunca se veia.
   // v4.3: la tesis se marca con focusThesis (tinta, anotacion, resto atenuado); dist opcional = volar a ella
   function onPointClick(idx, dist) {
+    if (idx != null && state.areaCode[idx] !== AREA_MAPA) return;
     showPointCard(idx);
     if (pointInfo(idx) === undefined) titleTileFor(idx).then(function () { showPointCard(idx); drawMarks(); });
     focusThesis(idx, null, dist);
@@ -1806,17 +1803,20 @@
     var can = asesoresDe(state.thesisIdToIndex.get(r[0])); // nombres unificados (v4.2)
     return { id: r[0], t: tituloTesis(r[1]), y: r[2], pl: pretty(r[3]), pr: pretty(r[4]), nv: r[5], as: can || r[6] || [], k: norm(r[1]).replace(/[^a-z0-9 ]/g, '') };
   }
+  function esIdxArea(i) { return i != null && state.areaCode[i] === AREA_MAPA; }
+  function rowEsArea(r) { return esIdxArea(state.thesisIdToIndex.get(r.id)); }
   var nodeThesesCache = {};
   function loadThesesFor(n) {
     var lvl = n.level || 'macro', key = lvl + ':' + (lvl === 'macro' ? n.macroId : n.clusterId);
     if (nodeThesesCache[key]) return nodeThesesCache[key];
     var p;
-    if (lvl === 'micro') p = loadMicroTheses(n.clusterId).then(function (d) { return d.rows.map(rowObj); });
+    if (lvl === 'micro') p = loadMicroTheses(n.clusterId).then(function (d) { return d.rows.map(rowObj).filter(rowEsArea); });
     else p = loadMicro(n.macroId).then(function (c) {
       return Promise.all(c.nodes.map(function (u) { return loadMicroTheses(u.clusterId); }));
     }).then(function (ds) {
       var rows = [];
       ds.forEach(function (d) { if (lvl === 'macro' || d.mesoId === n.clusterId) d.rows.forEach(function (r) { rows.push(rowObj(r)); }); });
+      rows = rows.filter(rowEsArea);
       rows.sort(function (a, b) { return a.k < b.k ? -1 : a.k > b.k ? 1 : 0; });
       return rows;
     });
@@ -2594,7 +2594,7 @@
       paradas.push({ m: 'asesor', html: a.aid == null ? '<span class="tf-v">' + escapeHtml(a.nombre) + '</span><span class="tf-sub">Asesoría</span>'
         : '<button type="button" class="tf-as" data-aid="' + a.aid + '" title="Ver sus tesis en el mapa">' + escapeHtml(a.nombre) +
           '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9M9 4.5L12.5 8 9 11.5"/></svg></button>' +
-          '<b class="tf-n" title="Tesis que dirigió en total">' + fmtNum(ases.n[a.aid]) + '</b>' });
+          '<b class="tf-n" title="Tesis que dirigió">' + fmtNum(ases.ncs ? ases.ncs[a.aid] : 0) + '</b>' });
     });
     // categoría del mapa (no del catálogo): el campo si el agrupamiento la asignó;
     // si quedó como ruido (67% del corpus), su área y el campo más cercano a su posición
@@ -2685,7 +2685,7 @@
   // generar_atlas_busqueda.py: por cada tesis del atlas, sus asesores (CSR alineado con el
   // orden del mapa) y el anio. Cubre las 535,813 tesis con asesor en el catalogo, no solo
   // las de los temas finos. Base de la busqueda y de las futuras vistas de asesores.
-  var ases = { p: null, nombres: null, n: null, norm: null, off: null, ids: null, anio: null, inv: null };
+  var ases = { p: null, nombres: null, n: null, norm: null, off: null, ids: null, anio: null, inv: null, ncs: null };
   function loadAsesores() {
     if (!ases.p) ases.p = Promise.all([
       fetchJson('./data/asesores.v1.json'),
@@ -2696,6 +2696,7 @@
       ases.nombres = r[0].nombres; ases.n = r[0].n;
       ases.off = new Uint32Array(r[1], 0, N + 1); ases.ids = new Uint32Array(r[1], (N + 1) * 4);
       ases.anio = new Uint16Array(r[2]);
+      tesisDeAsesor(0); // deja armado el indice (y ncs) para la ficha y la busqueda
       return ases;
     }).catch(function (e) { dlog('asesores ' + e.message); ases.p = null; throw e; });
     return ases.p;
@@ -2706,15 +2707,16 @@
     for (var j = ases.off[idx]; j < ases.off[idx + 1]; j++) out.push(ases.nombres[ases.ids[j]]);
     return out;
   }
-  // tesis de un asesor: indice inverso, se arma una vez (~670k vinculos, ~30 ms)
+  // tesis de un asesor, solo las del area del mapa: indice inverso, se arma una vez (~670k vinculos, ~30 ms).
+  // ncs cuenta, por asesor, cuantas de sus tesis son del area (la ficha y la busqueda lo muestran).
   function tesisDeAsesor(aid) {
     if (!ases.inv) {
-      var A = ases.nombres.length, off = new Uint32Array(A + 1), lst = new Uint32Array(ases.ids.length), i, j;
-      for (j = 0; j < ases.ids.length; j++) off[ases.ids[j] + 1]++;
+      var A = ases.nombres.length, ncs = new Uint32Array(A), off = new Uint32Array(A + 1), i, j;
+      for (i = 0; i < state.n; i++) if (state.areaCode[i] === AREA_MAPA) for (j = ases.off[i]; j < ases.off[i + 1]; j++) ncs[ases.ids[j]]++;
       for (i = 1; i <= A; i++) off[i] += off[i - 1];
-      var pos = off.slice(0, A);
-      for (i = 0; i < state.n; i++) for (j = ases.off[i]; j < ases.off[i + 1]; j++) lst[pos[ases.ids[j]]++] = i;
-      ases.inv = { off: off, lst: lst };
+      var lst = new Uint32Array(off[A]), pos = off.slice(0, A);
+      for (i = 0; i < state.n; i++) if (state.areaCode[i] === AREA_MAPA) for (j = ases.off[i]; j < ases.off[i + 1]; j++) lst[pos[ases.ids[j]]++] = i;
+      ases.inv = { off: off, lst: lst }; ases.ncs = ncs;
     }
     return ases.inv.lst.subarray(ases.inv.off[aid], ases.inv.off[aid + 1]);
   }
@@ -2827,11 +2829,12 @@
         .sort(function (a, b) { return b.s - a.s; }).slice(0, 6).map(function (x) { return x.e; });
       var asesores = [];
       if (ases.nombres) {
+        if (!ases.inv) tesisDeAsesor(0);
         if (!ases.norm) ases.norm = ases.nombres.map(palabras);
-        for (var a = 0; a < ases.norm.length && asesores.length < 400; a++) if (coincide(ases.norm[a], toks)) asesores.push(a);
-        asesores = asesores.sort(function (x, y) { return ases.n[y] - ases.n[x]; }).slice(0, 5); // ids ya vienen por n desc
+        for (var a = 0; a < ases.norm.length && asesores.length < 400; a++) if (ases.ncs[a] && coincide(ases.norm[a], toks)) asesores.push(a);
+        asesores = asesores.sort(function (x, y) { return ases.ncs[y] - ases.ncs[x]; }).slice(0, 5); // se ordenan por sus tesis del area
       }
-      var hits = r[2] || new Uint32Array(0);
+      var hits = (r[2] || new Uint32Array(0)).filter(function (i) { return state.areaCode[i] === AREA_MAPA; });
       search.hits = hits; search.q = raw.trim();
       // tesis a mostrar: las mas recientes
       var muestra = Array.prototype.slice.call(hits);
@@ -2861,7 +2864,7 @@
         // territorio dominante solo si concentra al menos el 30% de sus tesis; si no, gris
         if (bn < 0.3 * ts.length) best = -1;
         var sub = 'Asesor' + (best >= 0 ? ', sobre todo en ' + escapeHtml(state.macroById[best].name) : '');
-        html += filaHtml(res.length, colorTerritorio(best), 'asesor', escapeHtml(ases.nombres[aid]), sub, fmtNum(ases.n[aid])); res.push({ type: 'asesor', aid: aid });
+        html += filaHtml(res.length, colorTerritorio(best), 'asesor', escapeHtml(ases.nombres[aid]), sub, fmtNum(ases.ncs[aid])); res.push({ type: 'asesor', aid: aid });
       });
     }
     if (total) {
@@ -2917,6 +2920,7 @@
     closeSearch();
     if (state.iso) exitIsolation();
     idxs = Array.prototype.slice.call(idxs);
+    if (!idxs.length) return;
     state.searchPin = true;
     clearFocus();
     pinIndices('busq|' + titulo, idxs);
@@ -3010,7 +3014,8 @@
     if (!tmeta || !ases.off) Promise.all([loadTesisMeta(), loadAsesores().catch(function () {})]).then(pinta);
   }
   function verAsesor(aid) {
-    verEnMapa(tesisDeAsesor(aid), ases.nombres[aid], { aid: aid });
+    var ts = tesisDeAsesor(aid); if (!ts.length) return;
+    verEnMapa(ts, ases.nombres[aid], { aid: aid });
   }
   function pickResult(i) {
     var r = search.results[i]; if (!r) return;
@@ -3507,6 +3512,7 @@
     if (state.iso) stopFlow();
     var b = $('ms-similares'); b.disabled = true; b.textContent = 'Buscando similares…';
     loadVecinas(idx).then(function (vs) {
+      vs = vs.filter(function (v) { return state.areaCode[v.i] === AREA_MAPA; });
       var todas = [idx].concat(vs.map(function (v) { return v.i; }));
       return Promise.all(todas.map(titleTileFor).concat([loadTesisMeta(), loadAsesores().catch(function () {})])).then(function () { return vs; });
     }).then(function (vs) {
@@ -3757,13 +3763,6 @@
     b.addEventListener('click', function () {
       document.querySelectorAll('#density-toggle button').forEach(function (x) { x.classList.toggle('active', x === b); });
       state.densityPct = parseFloat(b.getAttribute('data-pct')); state.highlightKey = ''; restoreView();
-    });
-  });
-  document.querySelectorAll('#area-toggle button').forEach(function (b) {
-    b.addEventListener('click', function () {
-      document.querySelectorAll('#area-toggle button').forEach(function (x) { x.classList.toggle('active', x === b); });
-      state.areaFilter = +b.getAttribute('data-area'); state.highlightKey = ''; restoreView();
-      $('fb-count').textContent = state.areaFilter ? fmtNum(areaIndices(state.areaFilter).length) + ' de ' + fmtNum(state.n) + ' tesis' : fmtNum(state.n) + ' tesis';
     });
   });
   $('debug-log-toggle').addEventListener('click', function () { $('debug-log').hidden = !$('debug-log').hidden; });
