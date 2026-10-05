@@ -371,6 +371,7 @@
   .tf-m.tf-p.programa::before { background: var(--paper); box-shadow: inset 0 0 0 2px var(--c); }
   .tf-m.tf-p.plantel::before { background: var(--ink-2); }
   .tf-m.tf-p.asesor::before { left: 1.5px; top: calc(var(--dt) - 1px); width: 11px; height: 11px; background: var(--paper); box-shadow: inset 0 0 0 2.2px var(--ink); }
+  .tf-m.tf-p.campo::before { border-radius: 2.5px; background: var(--paper); box-shadow: inset 0 0 0 2px var(--c); }
   .tf-m.tf-p.sigue::after { content: ""; position: absolute; left: 6px; width: 2px; top: calc(var(--dt) + 11px); height: calc(100% - 13px); background: var(--c); }
   .tf-as { border: 0; padding: 0; background: none; font: inherit; color: var(--ink); font-weight: 500; text-align: left; cursor: pointer; }
   .tf-as:hover { color: var(--link); text-decoration: underline; }
@@ -2818,6 +2819,19 @@
           '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9M9 4.5L12.5 8 9 11.5"/></svg></button>' +
           '<b class="tf-n" title="Tesis que dirigió en total">' + fmtNum(ases.n[a.aid]) + '</b>' });
     });
+    // categoría del mapa (no del catálogo): el campo si el agrupamiento la asignó;
+    // si quedó como ruido (67% del corpus), su área y el campo más cercano a su posición
+    var mcm = state.macroCode[idx], mm = mcm >= 0 ? state.macroById[mcm] : null;
+    if (mm) {
+      paradas.push({ m: 'campo', html: '<button type="button" class="tf-as" data-macro="' + mcm + '" title="Ir a su campo">' + escapeHtml(mm.name) +
+        '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9M9 4.5L12.5 8 9 11.5"/></svg></button><span class="tf-sub">Campo</span>' });
+    } else {
+      var cerca = state.rawX && state.macros.length ? nearest(state.macros, state.rawX[idx], state.rawY[idx]) : null;
+      paradas.push({ m: 'campo', html: '<span class="tf-v" title="Sin campo: el agrupamiento por densidad la dejó fuera">' + escapeHtml(AREA_NAMES[ac]) + '</span>' +
+        '<span class="tf-sub">Sin campo · área</span>' +
+        (cerca ? '<div><button type="button" class="tf-as" data-macro="' + cerca.macroId + '" title="Campo más cercano a su posición; no pertenece a él">≈ ' + escapeHtml(cerca.name) +
+          '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9M9 4.5L12.5 8 9 11.5"/></svg></button></div>' : '') });
+    }
     paradas.forEach(function (st, k) {
       html += '<span class="tf-m tf-p' + (st.m ? ' ' + st.m : '') + (k < paradas.length - 1 ? ' sigue' : '') + '"></span>' +
         '<div class="tf-c ' + (st.cls || '') + '">' + st.html + '</div>';
